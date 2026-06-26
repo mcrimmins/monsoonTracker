@@ -15,7 +15,7 @@ invisible(lapply(c(dir_raw, dir_processed, dir_temp), fs::dir_create, recurse = 
 aoi_southwest <- c(45, -125, 15, -95)
 
 # 3. Temporal Parameters (June through October)
-clim_years    <- as.character(1991:1991)
+clim_years    <- as.character(1991:2025)
 target_months <- c("06", "07", "08", "09", "10") 
 target_hours  <- sprintf("%02d:00", 0:23)       
 
