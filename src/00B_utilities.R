@@ -159,3 +159,223 @@ plot(pwat_mm,
 
 map("world", add = TRUE, col = "black", lwd = 1.5)
 map("state", add = TRUE, col = "gray20", lwd = 1, lty = 3)
+
+##### PWAT plotting test...
+# src/05_test_daily_pwat.R
+library(terra)
+library(maps)
+
+# 1. Load the raw hourly PWAT file
+nc_file <- "data/raw/era5_single_1991_07.nc"
+message("Loading NetCDF: ", nc_file)
+pwat_hourly <- rast(nc_file)
+
+# 2. Create a grouping index
+# July has 31 days, so the file has 744 layers (31 * 24).
+# We create a vector that repeats '1' twenty-four times, '2' twenty-four times, etc.
+n_days <- nlyr(pwat_hourly) / 24
+daily_index <- rep(1:n_days, each = 24)
+
+# 3. Calculate daily averages
+message("Averaging 24-hour blocks into daily means...")
+pwat_daily <- tapp(pwat_hourly, index = daily_index, fun = mean)
+
+# 4. Plot the daily average for July 1 (Layer 1)
+plot(pwat_daily[[1]], 
+     main = "Daily Average PWAT (mm)\nJuly 1, 1991", 
+     col = colorRampPalette(c("white", "lightblue", "blue", "magenta"))(50),
+     mar = c(3, 3, 3, 4))
+
+map("world", add = TRUE, col = "black", lwd = 1.5)
+map("state", add = TRUE, col = "gray20", lwd = 1, lty = 3)
+
+
+###### generic daily averaging script ----
+# src/03_daily_averages_benchmark.R
+library(terra)
+library(stringr)
+
+# Source project configurations
+source("config.R")
+
+# =========================================================================
+# 1. INITIALIZATION & ENGINE TUNING
+# =========================================================================
+cat("\n==================================================\n")
+cat(" INITIALIZING PERFORMANCE BENCHMARK ENGINE\n")
+cat("==================================================\n")
+
+total_start_time <- Sys.time()
+
+# Optimize hardware resource allocation
+n_cores <- max(1, parallel::detectCores() - 1)
+terraOptions(cores = n_cores)
+terraOptions(memfrac = 0.8)
+
+cat(sprintf("[INIT] Detected %s Logical Processors.\n", parallel::detectCores()))
+cat(sprintf("[INIT] Threading set to %s cores (Intel TBB C++ mode active).\n", n_cores))
+cat("[INIT] Memory allocation ceiling pushed to 80% RAM.\n")
+
+# Aggregation metric choice ("mean" or "max")
+aggr_metric <- "mean"
+
+# Build the queue and isolate to our single test year
+job_queue <- expand.grid(month = target_months, year = clim_years, stringsAsFactors = FALSE)
+test_year <- 1991
+job_queue <- job_queue[job_queue$year == test_year, ]
+
+cat(sprintf("[INIT] Benchmark isolated to Year: %s (%s months total)\n", test_year, nrow(job_queue)))
+cat("==================================================\n\n")
+
+# =========================================================================
+# 2. RUN PIPELINE WITH GRANULAR TIMERS
+# =========================================================================
+for (i in 1:nrow(job_queue)) {
+  yr  <- job_queue$year[i]
+  mon <- job_queue$month[i]
+  jid <- paste0(yr, "_", mon)
+  
+  raw_pl_file  <- file.path(dir_raw, paste0("era5_pressure_", jid, ".nc"))
+  raw_sl_file  <- file.path(dir_raw, paste0("era5_single_", jid, ".nc"))
+  
+  out_pl_file  <- file.path(dir_processed, sprintf("daily_%s_era5_pressure_%s.nc", aggr_metric, jid))
+  out_sl_file  <- file.path(dir_processed, sprintf("daily_%s_era5_single_%s.nc", aggr_metric, jid))
+  
+  cat(sprintf("▶ STARTING PROCESSING BLOCK FOR: %s-%s\n", yr, mon))
+  month_start_time <- Sys.time()
+  
+  # -------------------------------------------------------------------------
+  # STEP A: 3D PRESSURE LEVELS (q & z)
+  # -------------------------------------------------------------------------
+  cat("  [Step 1/2] Checking 3D Pressure Levels...\n")
+  
+  if (file.exists(raw_pl_file) && !file.exists(out_pl_file)) {
+    pl_start_time <- Sys.time()
+    
+    cat("    - Loading metadata from NetCDF disk... ")
+    raw_stack   <- rast(raw_pl_file)
+    layer_names <- names(raw_stack)
+    
+    vars_present   <- unique(str_extract(layer_names, "^[^_]+"))
+    levels_present <- unique(str_extract(layer_names, "(?<=pressure_level=)\\d+"))
+    levels_present <- levels_present[!is.na(levels_present)]
+    cat("Done.\n")
+    
+    pl_layers <- list()
+    
+    for (v in vars_present) {
+      for (lvl in levels_present) {
+        loop_start <- Sys.time()
+        cat(sprintf("    - Processing Variable '%s' at %s hPa:\n", v, lvl))
+        
+        sub_pattern <- sprintf("^%s_pressure_level=%s_", v, lvl)
+        matching_indices <- which(str_detect(layer_names, sub_pattern))
+        if (length(matching_indices) == 0) {
+          cat("        * Skipped (No layers found).\n")
+          next
+        }
+        
+        sub_stack <- raw_stack[[matching_indices]]
+        
+        # --- THE RAM-FORCE TWEAK (CHUNKED) ---
+        cat("        * Reading from disk to RAM cache (~2 mins)... ")
+        ram_start <- Sys.time()
+        sub_layer_names <- names(sub_stack)
+        sub_stack <- sub_stack + 0 
+        names(sub_stack) <- sub_layer_names
+        ram_end <- Sys.time()
+        cat(sprintf("Done (%s sec).\n", round(difftime(ram_end, ram_start, units="secs"), 2)))
+        
+        # --- CALCULATE DAILY AVERAGES ---
+        cat(sprintf("        * Executing C++ '%s' reduction matrix... ", aggr_metric))
+        n_days      <- nlyr(sub_stack) / 24
+        daily_index <- rep(1:n_days, each = 24)
+        
+        daily_sub_stack <- tapp(sub_stack, index = daily_index, fun = aggr_metric)
+        names(daily_sub_stack) <- sprintf("%s_%shPa_day_%s", v, lvl, 1:n_days)
+        cat("Done.\n")
+        
+        pl_layers[[paste0(v, "_", lvl)]] <- daily_sub_stack
+        
+        loop_end <- Sys.time()
+        cat(sprintf("        * Total sub-step time: %s sec.\n", round(difftime(loop_end, loop_start, units="secs"), 2)))
+      }
+    }
+    
+    # Write full 3D stack back to disk
+    cat("    - Compiling variables and compiling output NetCDF... ")
+    write_start <- Sys.time()
+    master_pl_stack <- rast(pl_layers)
+    writeCDF(master_pl_stack, out_pl_file, overwrite = TRUE)
+    write_end <- Sys.time()
+    cat(sprintf("Done (%s sec).\n", round(difftime(write_end, write_start, units="secs"), 2)))
+    
+    pl_end_time <- Sys.time()
+    cat(sprintf("  ✔ Completed 3D Pressure Levels in: %s seconds.\n", 
+                round(difftime(pl_end_time, pl_start_time, units="secs"), 1)))
+    
+  } else if (!file.exists(raw_pl_file)) {
+    cat("  ⚠️  [Skip 3D] Raw source file missing from data/raw/.\n")
+  } else {
+    cat("  ℹ️  [Skip 3D] Processed target file already exists in data/processed/.\n")
+  }
+  
+  # -------------------------------------------------------------------------
+  # STEP B: SINGLE LEVEL PWAT (tcwv)
+  # -------------------------------------------------------------------------
+  cat("  [Step 2/2] Checking Single Level PWAT...\n")
+  
+  if (file.exists(raw_sl_file) && !file.exists(out_sl_file)) {
+    sl_start_time <- Sys.time()
+    
+    cat("    - Loading and RAM-forcing PWAT layer... ")
+    pwat_hourly <- rast(raw_sl_file)
+    
+    # RAM-Force PWAT
+    pwat_names <- names(pwat_hourly)
+    pwat_hourly <- pwat_hourly + 0
+    names(pwat_hourly) <- pwat_names
+    cat("Done.\n")
+    
+    cat(sprintf("    - Executing C++ '%s' reduction matrix... ", aggr_metric))
+    n_days      <- nlyr(pwat_hourly) / 24
+    daily_index <- rep(1:n_days, each = 24)
+    
+    pwat_daily  <- tapp(pwat_hourly, index = daily_index, fun = aggr_metric)
+    names(pwat_daily) <- sprintf("tcwv_day_%s", 1:n_days)
+    cat("Done.\n")
+    
+    cat("    - Writing processed PWAT NetCDF to disk... ")
+    write_sl_start <- Sys.time()
+    writeCDF(pwat_daily, out_sl_file, overwrite = TRUE)
+    write_sl_end <- Sys.time()
+    cat(sprintf("Done (%s sec).\n", round(difftime(write_sl_end, write_sl_start, units="secs"), 2)))
+    
+    sl_end_time <- Sys.time()
+    cat(sprintf("  ✔ Completed PWAT Analysis in: %s seconds.\n", 
+                round(difftime(sl_end_time, sl_start_time, units="secs"), 1)))
+    
+  } else if (!file.exists(raw_sl_file)) {
+    cat("  ⚠️  [Skip PWAT] Raw source file missing from data/raw/.\n")
+  } else {
+    cat("  ℹ️  [Skip PWAT] Processed target file already exists in data/processed/.\n")
+  }
+  
+  month_end_time <- Sys.time()
+  cat(sprintf("🏁 FINISHED BLOCK %s-%s in total time of: %s seconds.\n", 
+              yr, mon, round(difftime(month_end_time, month_start_time, units="secs"), 1)))
+  cat("--------------------------------------------------\n\n")
+}
+
+# =========================================================================
+# 3. GLOBAL PERFORMANCE METRIC REPORT
+# =========================================================================
+total_end_time <- Sys.time()
+total_duration <- total_end_time - total_start_time
+
+cat("==================================================\n")
+cat(sprintf(" FINAL BENCHMARK PERFORMANCE REPORT (YEAR: %s)\n", test_year))
+cat("==================================================\n")
+cat("Total Clock Run Duration:\n")
+print(total_duration)
+cat("==================================================\n")
