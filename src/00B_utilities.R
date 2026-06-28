@@ -379,3 +379,105 @@ cat("==================================================\n")
 cat("Total Clock Run Duration:\n")
 print(total_duration)
 cat("==================================================\n")
+
+
+##### parallel testing...
+
+# src/03_parallel_test_worker.R
+library(terra)
+library(stringr)
+
+source("config.R")
+
+# Accept specific years from the launcher
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) == 2) {
+  start_yr <- as.numeric(args[1])
+  end_yr   <- as.numeric(args[2])
+} else {
+  stop("Missing year range arguments. Use the parallel launcher script.")
+}
+
+# Ultrabook-friendly resource configuration
+n_cores <- 2  
+terraOptions(cores = n_cores)
+terraOptions(memfrac = 0.20) 
+
+aggr_metric <- "mean"
+
+# Filter the test queue for this worker's assigned block
+job_queue <- expand.grid(month = target_months, year = clim_years, stringsAsFactors = FALSE)
+job_queue <- job_queue[job_queue$year >= start_yr & job_queue$year <= end_yr, ]
+
+message(sprintf("\n[WORKER START] Range: %s to %s | Processing %s months.\n", start_yr, end_yr, nrow(job_queue)))
+worker_start_time <- Sys.time()
+
+for (i in 1:nrow(job_queue)) {
+  yr  <- job_queue$year[i]
+  mon <- job_queue$month[i]
+  jid <- paste0(yr, "_", mon)
+  
+  raw_pl_file  <- file.path(dir_raw, paste0("era5_pressure_", jid, ".nc"))
+  raw_sl_file  <- file.path(dir_raw, paste0("era5_single_", jid, ".nc"))
+  out_pl_file  <- file.path(dir_processed, sprintf("daily_%s_era5_pressure_%s.nc", aggr_metric, jid))
+  out_sl_file  <- file.path(dir_processed, sprintf("daily_%s_era5_single_%s.nc", aggr_metric, jid))
+  
+  # Step A: 3D Pressure Levels
+  if (file.exists(raw_pl_file) && !file.exists(out_pl_file)) {
+    loop_start  <- Sys.time()
+    raw_stack   <- rast(raw_pl_file)
+    layer_names <- names(raw_stack)
+    vars_present   <- unique(str_extract(layer_names, "^[^_]+"))
+    levels_present <- unique(str_extract(layer_names, "(?<=pressure_level=)\\d+"))
+    levels_present <- levels_present[!is.na(levels_present)]
+    
+    pl_layers <- list()
+    for (v in vars_present) {
+      for (lvl in levels_present) {
+        sub_pattern <- sprintf("^%s_pressure_level=%s_", v, lvl)
+        matching_indices <- which(str_detect(layer_names, sub_pattern))
+        if (length(matching_indices) == 0) next
+        
+        sub_stack <- raw_stack[[matching_indices]]
+        
+        # Safe chunked RAM-force
+        sub_layer_names <- names(sub_stack)
+        sub_stack <- sub_stack + 0 
+        names(sub_stack) <- sub_layer_names
+        
+        n_days      <- nlyr(sub_stack) / 24
+        daily_index <- rep(1:n_days, each = 24)
+        daily_sub_stack <- tapp(sub_stack, index = daily_index, fun = aggr_metric)
+        names(daily_sub_stack) <- sprintf("%s_%shPa_day_%s", v, lvl, 1:n_days)
+        
+        pl_layers[[paste0(v, "_", lvl)]] <- daily_sub_stack
+      }
+    }
+    master_pl_stack <- rast(pl_layers)
+    writeCDF(master_pl_stack, out_pl_file, overwrite = TRUE)
+    
+    loop_end <- Sys.time()
+    message(sprintf("  [%s-%s] Finished 3D Levels in %s sec.", yr, mon, round(difftime(loop_end, loop_start, units="secs"), 1)))
+  }
+  
+  # Step B: PWAT
+  if (file.exists(raw_sl_file) && !file.exists(out_sl_file)) {
+    pwat_hourly <- rast(raw_sl_file)
+    pwat_names  <- names(pwat_hourly)
+    pwat_hourly <- pwat_hourly + 0
+    names(pwat_hourly) <- pwat_names
+    
+    n_days      <- nlyr(pwat_hourly) / 24
+    daily_index <- rep(1:n_days, each = 24)
+    pwat_daily  <- tapp(pwat_hourly, index = daily_index, fun = aggr_metric)
+    names(pwat_daily) <- sprintf("tcwv_day_%s", 1:n_days)
+    
+    writeCDF(pwat_daily, out_sl_file, overwrite = TRUE)
+  }
+}
+
+worker_end_time <- Sys.time()
+message(sprintf("\n[WORKER FINISHED] Range %s-%s completed in %s minutes.\n", 
+                start_yr, end_yr, round(difftime(worker_end_time, worker_start_time, units="mins"), 1)))
+
+
