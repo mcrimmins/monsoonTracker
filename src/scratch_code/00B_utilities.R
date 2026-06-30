@@ -481,3 +481,126 @@ message(sprintf("\n[WORKER FINISHED] Range %s-%s completed in %s minutes.\n",
                 start_yr, end_yr, round(difftime(worker_end_time, worker_start_time, units="mins"), 1)))
 
 
+
+
+
+
+
+##### testing single time slice approach...
+# src/03_daily_slices_benchmark.R
+library(terra)
+library(stringr)
+
+# Source project configurations
+source("config.R")
+
+cat("\n==================================================\n")
+cat(" INITIALIZING 4-TIMES-DAILY SAMPLING BENCHMARK\n")
+cat("==================================================\n")
+
+total_start_time <- Sys.time()
+
+# Light configuration for the ThinkPad X1 Carbon
+n_cores <- 2
+terraOptions(cores = n_cores)
+terraOptions(memfrac = 0.25)
+
+cat(sprintf("[INIT] Using %s cores for underlying C++ ops.\n", n_cores))
+
+# Aggregation metric (e.g., mean of the 4 daily slices)
+aggr_metric <- "mean"
+
+# Filter to a single test block for clean benchmarking
+job_queue <- expand.grid(month = target_months, year = clim_years, stringsAsFactors = FALSE)
+test_year <- 1991
+job_queue <- job_queue[job_queue$year == test_year, ]
+
+# Take the first month in the queue to run the benchmark speed test
+yr  <- job_queue$year[1]
+mon <- job_queue$month[1]
+jid <- paste0(yr, "_", mon)
+
+raw_pl_file  <- file.path(dir_raw, paste0("era5_pressure_", jid, ".nc"))
+out_pl_file  <- file.path(dir_processed, sprintf("sliced_daily_%s_era5_pressure_%s.nc", aggr_metric, jid))
+
+cat(sprintf("▶ RUNNING BENCHMARK ON TEST BLOCK: %s-%s\n", yr, mon))
+month_start_time <- Sys.time()
+
+if (file.exists(raw_pl_file)) {
+  
+  cat("    - Reading file structural metadata... ")
+  raw_stack   <- rast(raw_pl_file)
+  layer_names <- names(raw_stack)
+  
+  vars_present   <- unique(str_extract(layer_names, "^[^_]+"))
+  levels_present <- unique(str_extract(layer_names, "(?<=pressure_level=)\\d+"))
+  levels_present <- levels_present[!is.na(levels_present)]
+  cat("Done.\n")
+  
+  pl_layers <- list()
+  
+  for (v in vars_present) {
+    for (lvl in levels_present) {
+      loop_start <- Sys.time()
+      cat(sprintf("    - Processing Substack '%s' at %s hPa:\n", v, lvl))
+      
+      sub_pattern <- sprintf("^%s_pressure_level=%s_", v, lvl)
+      matching_indices <- which(str_detect(layer_names, sub_pattern))
+      if (length(matching_indices) == 0) next
+      
+      # Extract the master pointer stack for this variable-level combo
+      sub_stack <- raw_stack[[matching_indices]]
+      
+      # -------------------------------------------------------------------------
+      # THE SUB-SAMPLING FILTER (00Z, 06Z, 12Z, 18Z)
+      # -------------------------------------------------------------------------
+      total_hours <- nlyr(sub_stack)
+      slice_indices <- seq(1, total_hours, by = 6) # Grabs hours 1, 7, 13, 19...
+      
+      # Apply slice filter directly to the file pointer
+      sub_stack_sliced <- sub_stack[[slice_indices]]
+      
+      # Force only the sliced data into RAM (83% less memory consumption!)
+      cat("        * Pulling 4 daily slices into RAM... ")
+      ram_start <- Sys.time()
+      sub_layer_names <- names(sub_stack_sliced)
+      sub_stack_sliced <- sub_stack_sliced + 0 
+      names(sub_stack_sliced) <- sub_layer_names
+      ram_end <- Sys.time()
+      cat(sprintf("Done (%s sec).\n", round(difftime(ram_end, ram_start, units="secs"), 2)))
+      
+      # -------------------------------------------------------------------------
+      # CALCULATE REDUCED DAILY METRIC
+      # -------------------------------------------------------------------------
+      cat(sprintf("        * Reducing 4-slice daily matrix (%s)... ", aggr_metric))
+      n_days      <- nlyr(sub_stack_sliced) / 4
+      daily_index <- rep(1:n_days, each = 4)
+      
+      daily_sub_stack <- tapp(sub_stack_sliced, index = daily_index, fun = aggr_metric)
+      names(daily_sub_stack) <- sprintf("%s_%shPa_day_%s", v, lvl, 1:n_days)
+      cat("Done.\n")
+      
+      pl_layers[[paste0(v, "_", lvl)]] <- daily_sub_stack
+      
+      loop_end <- Sys.time()
+      cat(sprintf("        * Total sub-step time: %s sec.\n", round(difftime(loop_end, loop_start, units="secs"), 2)))
+    }
+  }
+  
+  # Export compiled stack
+  cat("    - Compiling variables and writing output NetCDF... ")
+  write_start <- Sys.time()
+  master_pl_stack <- rast(pl_layers)
+  writeCDF(master_pl_stack, out_pl_file, overwrite = TRUE)
+  write_end <- Sys.time()
+  cat(sprintf("Done (%s sec).\n", round(difftime(write_end, write_start, units="secs"), 2)))
+  
+} else {
+  stop(sprintf("Raw file missing: %s", raw_pl_file))
+}
+
+month_end_time <- Sys.time()
+cat("\n==================================================\n")
+cat(sprintf("🏁 BENCHMARK COMPLETE FOR DETACHED BLOCK: %s-%s\n", yr, mon))
+cat(sprintf("Total Elapsed Processing Time: %s seconds.\n", round(difftime(month_end_time, month_start_time, units="secs"), 1)))
+cat("==================================================\n")
