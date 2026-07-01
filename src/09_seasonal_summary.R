@@ -230,7 +230,7 @@ generate_seasonal_summary <- function(target_year,
 # =========================================================================
 
 # --- Single year ---
-generate_seasonal_summary(target_year = 2020)
+generate_seasonal_summary(target_year = 2021)
 
 # --- Batch: every year with processed data + anomalies on hand ---
 # for (yr in 1991:2025) {
