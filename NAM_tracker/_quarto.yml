@@ -1,0 +1,39 @@
+project:
+  type: website
+  output-dir: _site
+  resources:
+    - "output/"
+
+website:
+  title: "NAM Diagnostic Hub"
+  navbar:
+    background: primary
+    left:
+      - text: "Home"
+        href: index.qmd
+      - text: "Monsoon Basics & Climo"
+        href: climatology.qmd
+      - text: "Historical Seasons"
+        menu:
+          - text: "All Seasons (1991-2025)"
+            href: season-index.qmd
+          - text: "---"
+          - text: "2025 Season"
+            href: years/2025.qmd
+          - text: "2024 Season"
+            href: years/2024.qmd
+          - text: "2023 Season"
+            href: years/2023.qmd
+          - text: "2022 Season"
+            href: years/2022.qmd
+          - text: "2021 Season"
+            href: years/2021.qmd
+      - text: "Data & Methods"
+        href: methods.qmd
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+    page-layout: full

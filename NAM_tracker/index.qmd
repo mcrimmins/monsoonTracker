@@ -1,0 +1,30 @@
+---
+title: "North American Monsoon Diagnostic Hub"
+---
+
+This site tracks the North American Monsoon (NAM) across the Southwest US and northern Mexico using 35 years of ERA5 reanalysis (1991–2025). It follows the monsoon ridge, total column moisture, and how each season compares to the long-term normal — day by day, in 5-day blocks, and across the full season — built and maintained by the Climate Science Applications Program at the University of Arizona.
+
+Looking for this year? Jump straight to the [2025 season](years/2025.qmd).
+
+```{=html}
+<div class="home-grid">
+  <a class="home-card" href="climatology.qmd">
+    <div class="home-card-title">Monsoon Basics &amp; Climatology</div>
+    <div class="home-card-desc">What the site tracks, the 1991&ndash;2025 baseline, and what a normal season looks like.</div>
+  </a>
+  <a class="home-card" href="season-index.qmd">
+    <div class="home-card-title">Historical Seasons</div>
+    <div class="home-card-desc">Browse any year from 1991 to today &mdash; daily player, Hovm&ouml;ller diagram, and 5-day evolution grids.</div>
+  </a>
+  <a class="home-card" href="methods.qmd">
+    <div class="home-card-title">Data &amp; Methods</div>
+    <div class="home-card-desc">ERA5 data source, processing pipeline, ridge detection, and the conventions used throughout.</div>
+  </a>
+</div>
+
+<div class="program-footer">
+  <a href="https://cales.arizona.edu/climate" target="_blank" rel="noopener">
+    <img src="images/program_logos.png" alt="CLIMAS, Climate Science Applications Program (CSAP), and University of Arizona Cooperative Extension" />
+  </a>
+</div>
+```

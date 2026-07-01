@@ -1,0 +1,31 @@
+---
+title: "Monsoon Basics & Climatology"
+---
+
+## What this site tracks
+
+The North American Monsoon (NAM) brings the Southwest's wet season each summer, driven by a subtropical ridge of high pressure that builds over the region and steers moist air north out of the Gulf of California and the tropical Pacific. This site tracks that evolution every day from June 1 through October 31, using three core diagnostics:
+
+- **TCWV** (total column water vapor) — a measure of how much moisture is sitting in the atmospheric column above a location. This is the main "is it monsoon-y here" signal used throughout the site.
+- **Z500** (500 hPa geopotential height) — the mid-level pressure pattern. Its local maximum is the monsoon ridge, marked on every map as **H**.
+- **Q700** (700 hPa specific humidity) — a lower-level moisture signal, useful for spotting surges that haven't shown up in the full column yet.
+
+Every map on this site pairs a fill (usually TCWV) with contour lines (usually Z500, sometimes Q700) and, where relevant, the tracked position of the ridge.
+
+## The 1991–2025 baseline
+
+"Normal" on this site means the 1991–2025 average for that exact calendar day (or 5-day block), built from ERA5 reanalysis and lightly smoothed across a 5-day window to reduce day-to-day noise. Every anomaly map or chart you see elsewhere on the site — daily, Hovmöller, or 5-day — is computed against this same pixel-by-pixel baseline. Full processing details are on the [Methods](methods.qmd) page.
+
+## A normal season, start to finish
+
+The grid below collapses 35 years of data into 25 five-day blocks running June 10 through October 12, showing the climatological mean TCWV, Z500 ridge position, and moisture contours at each stage of the season. This is the reference pattern every individual year on the [Historical Seasons](season-index.qmd) page gets compared against.
+
+![The 1991–2025 average evolution of TCWV (fill), Z500 height contours (gray), Q700 and TCWV moisture boundaries, and the climatological ridge position (H), in 5-day blocks from June 10 to October 12.](output/climatology_monsoon_evolution_5x5.png){fig-align="center"}
+
+## The season at a glance
+
+The same baseline collapsed further, into one mean state per calendar month, gives the coarsest possible view of how the ridge and moisture field migrate north through the summer and retreat in the fall.
+
+![Monthly mean TCWV, Z500 heights, and ridge position, June through October, 1991–2025.](output/climatology_monthly_1x5.png){fig-align="center"}
+
+For how any of this is actually computed — data source, baseline construction, ridge tracking, corridor and block definitions — see [Data & Methods](methods.qmd).

@@ -1,0 +1,183 @@
+/* ============================================================
+   NAM Diagnostic Hub - site theme
+   Accent colors are pulled from the TCWV / anomaly palettes used
+   throughout the data visualizations (05B, 06, 08, 09, 10), so
+   the site chrome and the charts read as one consistent system.
+   ============================================================ */
+
+:root {
+  --nam-teal:  #008080;   /* core monsoon moisture, TCWV ramp   */
+  --nam-blue:  #064cb5;   /* gulf surge blue, TCWV ramp         */
+  --nam-brown: #8c510a;   /* dry anomaly, anomaly ramp           */
+  --nam-wet:   #01665e;   /* wet anomaly, anomaly ramp           */
+  --nam-cream: #f4efe6;   /* transition zone, TCWV ramp          */
+}
+
+/* ---------------------------------------------------------
+   Navbar
+   --------------------------------------------------------- */
+.navbar {
+  background-color: var(--nam-teal) !important;
+}
+
+.navbar .nav-link,
+.navbar-brand {
+  color: #fff !important;
+}
+
+.navbar .nav-link:hover {
+  color: var(--nam-cream) !important;
+}
+
+/* ---------------------------------------------------------
+   Typography
+   --------------------------------------------------------- */
+h1, h2, h3 {
+  color: var(--nam-wet);
+}
+
+a {
+  color: var(--nam-blue);
+}
+
+a:hover {
+  color: var(--nam-brown);
+}
+
+/* ---------------------------------------------------------
+   Homepage quick-link cards (index.qmd)
+   --------------------------------------------------------- */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin: 2rem 0;
+}
+
+.home-card {
+  display: block;
+  padding: 1.25rem 1.5rem;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.home-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  border-color: var(--nam-teal);
+}
+
+.home-card-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--nam-wet);
+  margin-bottom: 0.4rem;
+}
+
+.home-card-desc {
+  font-size: 0.92rem;
+  color: #444;
+  line-height: 1.4;
+}
+
+/* ---------------------------------------------------------
+   Season index card grid (season-index.qmd)
+   --------------------------------------------------------- */
+.season-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.season-card {
+  display: block;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+  text-decoration: none;
+  background: #f2f2f2;
+  aspect-ratio: 4 / 3;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.season-card:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+}
+
+.season-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.season-card-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.35rem 0;
+  text-align: center;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0));
+}
+
+.season-card-pending {
+  background: repeating-linear-gradient(45deg, #eee, #eee 10px, #e2e2e2 10px, #e2e2e2 20px);
+}
+
+.season-card-pending .season-card-label {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.season-card-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------
+   Homepage program logo footer (index.qmd)
+   --------------------------------------------------------- */
+.program-footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #ddd;
+  text-align: center;
+}
+
+.program-footer img {
+  max-width: 480px;
+  width: 100%;
+  height: auto;
+  opacity: 0.92;
+  transition: opacity 0.15s ease;
+}
+
+.program-footer a:hover img {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------
+   Daily synoptic player + tabset polish (years/*.qmd)
+   --------------------------------------------------------- */
+.panel-tabset .nav-link.active {
+  color: var(--nam-wet) !important;
+  border-color: var(--nam-teal) var(--nam-teal) #fff !important;
+}
+
+.player-container {
+  border-color: var(--nam-teal) !important;
+}

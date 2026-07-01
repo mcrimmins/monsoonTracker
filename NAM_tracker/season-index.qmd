@@ -1,0 +1,36 @@
+---
+title: "Historical Seasons"
+---
+
+Browse any monsoon season from 1991 to the present. Each card opens that year's daily synoptic player, season Hovmöller diagram, and 5-day evolution grids. Years without a thumbnail haven't had their diagnostics generated yet — the page still loads, it just won't have much on it.
+
+```{r, echo=FALSE, results='asis'}
+years <- 2025:1991  # newest first
+
+cat('<div class="season-grid">\n')
+
+for (y in years) {
+  thumb <- sprintf("output/frames/%d/dashboard_%d0601.png", y, y)
+  has_data <- file.exists(thumb)
+
+  if (has_data) {
+    cat(sprintf(
+      '<a class="season-card" href="years/%d.qmd">
+  <img src="%s" alt="%d monsoon season thumbnail" loading="lazy" />
+  <div class="season-card-label">%d</div>
+</a>\n',
+      y, thumb, y, y
+    ))
+  } else {
+    cat(sprintf(
+      '<a class="season-card season-card-pending" href="years/%d.qmd">
+  <div class="season-card-placeholder">Data&nbsp;pending</div>
+  <div class="season-card-label">%d</div>
+</a>\n',
+      y, y
+    ))
+  }
+}
+
+cat('</div>\n')
+```

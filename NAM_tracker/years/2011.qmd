@@ -1,0 +1,72 @@
+---
+title: "2011 Monsoon Season"
+---
+
+### Daily Synoptic Diagnostic Player
+
+```{r, echo=FALSE, results='asis'}
+start_date <- as.Date("2011-06-01")
+```
+
+```{=html}
+<div class="player-container" style="max-width: 1000px; margin: 0 auto; text-align: center; border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: #fafafa;">
+  
+  <div style="width: 100%; min-height: 450px; background: #eee; display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+    <img id="monsoon-frame" src="../output/frames/2011/dashboard_20110601.png" onclick="window.open(this.src, '_blank')" title="Click to view full size" style="width: 100%; height: auto; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer;" />
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 15px; justify-content: center;">
+    <button onclick="prevFrame()" class="btn btn-outline-primary btn-sm">◀ Prev</button>
+    <input type="range" id="frame-slider" min="0" max="152" value="0" style="width: 60%;" oninput="updateFrame(this.value)" />
+    <button onclick="nextFrame()" class="btn btn-outline-primary btn-sm">Next ▶</button>
+    <button onclick="togglePlay()" id="play-btn" class="btn btn-primary btn-sm">Play</button>
+  </div>
+</div>
+
+<script>
+function pad(num) { return num.toString().padStart(2, '0'); }
+
+let currentFrame = 0;
+let playing = false;
+let playInterval;
+
+const frameImg = document.getElementById('monsoon-frame');
+const slider = document.getElementById('frame-slider');
+const playBtn = document.getElementById('play-btn');
+
+function updateFrame(index) {
+    currentFrame = parseInt(index);
+    slider.value = currentFrame;
+    
+    let targetDate = new Date(2011, 5, 1);
+    targetDate.setDate(targetDate.getDate() + currentFrame);
+    
+    let y = targetDate.getFullYear();
+    let m = pad(targetDate.getMonth() + 1);
+    let d = pad(targetDate.getDate());
+    
+    frameImg.src = `../output/frames/${y}/dashboard_${y}${m}${d}.png`;
+}
+
+function nextFrame() {
+    currentFrame = (currentFrame + 1) % 153;
+    updateFrame(currentFrame);
+}
+
+function prevFrame() {
+    currentFrame = (currentFrame - 1 + 153) % 153;
+    updateFrame(currentFrame);
+}
+
+function togglePlay() {
+    if(playing) {
+        clearInterval(playInterval);
+        playBtn.innerText = "Play";
+    } else {
+        playInterval = setInterval(nextFrame, 250);
+        playBtn.innerText = "Pause";
+    }
+    playing = !playing;
+}
+</script>
+```

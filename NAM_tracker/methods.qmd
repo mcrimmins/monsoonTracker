@@ -1,0 +1,48 @@
+---
+title: "Data & Methods"
+---
+
+## Data source
+
+All diagnostics on this site are built from [ERA5](https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-pressure-levels) hourly atmospheric reanalysis, downloaded from the Copernicus Climate Data Store.
+
+- **Spatial extent:** 15°N–45°N, 125°W–95°W (the Southwest US and northern Mexico)
+- **Temporal coverage:** 1991–2025, June through October each year
+- **Pressure levels:** 250, 500, 700, and 850 hPa
+- **Variables:** geopotential and specific humidity at each level, plus total column water vapor (TCWV) from the single-levels product
+
+Hourly data is collapsed to four daily time slices (00Z, 06Z, 12Z, 18Z) and averaged into a single daily value per pixel, per variable, per level. Geopotential is converted to geopotential meters (÷ 9.80665); specific humidity is converted to g/kg (× 1000).
+
+## Climatological baseline {#sec-baseline}
+
+"Normal" means the 1991–2025 mean for that exact calendar day, computed independently for every pixel, then smoothed with a 5-day rolling window along the time axis to reduce day-to-day sampling noise. Every anomaly shown anywhere on this site — daily dashboard, Hovmöller, or 5-day grid — is the actual value minus this same pixel-by-pixel baseline.
+
+## Ridge ("H") detection {#sec-ridge-tracking}
+
+The monsoon ridge marker is found with a two-pass focal-smoothing search over the 500 hPa height field, restricted to a search box that excludes the Pacific subtropical high so it isn't mistaken for the NAM ridge:
+
+1. **Macro pass:** a broad 15×15-cell smoothing identifies the general high-pressure region, then isolates the single largest contiguous patch within 10 m of that region's maximum height.
+2. **Micro pass:** within that patch, a finer 5×5-cell smoothing pinpoints the exact centroid — the cells within 2 m of the local maximum — which becomes the plotted "H" position.
+
+This two-stage approach keeps the ridge marker stable day to day instead of jumping to a noisy single-pixel maximum.
+
+## Hovmöller diagrams {#sec-hovmoller}
+
+Each day's TCWV field is zonally averaged — collapsed across longitude — within a fixed corridor (115°W–105°W, spanning the core Gulf of California moisture pathway) for every latitude row from 15°N to 45°N. Stacking that average by date produces one date-by-latitude image per season, with the 25 kg/m² contour marking the leading edge of monsoon-relevant moisture. The same procedure applied to the climatological baseline gives the dashed "normal" line plotted alongside the observed one.
+
+## 5-day pentad grids {#sec-pentad}
+
+The season is divided into 25 consecutive 5-day blocks running June 10 through October 12 (the same blocking used in the climatology grid on the [Basics & Climatology](climatology.qmd) page). The absolute grid shows each block's mean TCWV, Z500, and Q700; the anomaly grid shows that same block's mean values minus the equivalently-blocked 35-year baseline, computed pixel by pixel — not just a difference of two already-averaged maps.
+
+## Color conventions
+
+- **TCWV, observed:** brown → cream → green → teal → blue → purple, 5–65 kg/m²
+- **TCWV, anomaly:** brown (dry) → white (normal) → teal (wet), ±15 kg/m²
+- **Z500 height contours:** gray, 5500–6000 m
+- **Z500 anomaly contours:** steelblue dashed (negative / trough), hotpink solid (positive / ridge)
+
+These conventions are held constant across the daily dashboard, Hovmöller diagrams, and pentad grids so a color always means the same thing no matter which view you're looking at.
+
+## Reproducibility
+
+The full processing pipeline — download, daily aggregation, climatology, anomalies, and every figure on this site — is implemented in R (`terra`, `ecmwfr`, `ggplot2`, `tidyterra`, `patchwork`) and lives in the project's `src/` directory, numbered in pipeline order from data download through figure generation.
